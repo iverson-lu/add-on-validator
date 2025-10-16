@@ -200,6 +200,7 @@
         display: grid;
         gap: 20px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
       }
 
       .chart-card {
@@ -211,6 +212,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
+        min-height: 0;
       }
 
       .chart-card h4 {
@@ -223,6 +225,8 @@
       .chart-card canvas {
         width: 100%;
         height: 220px;
+        max-height: 100%;
+        flex: 0 0 220px;
       }
 
       .metrics-grid {
@@ -502,6 +506,17 @@
           "#22c55e",
         ];
 
+        const prepareCanvas = (canvas) => {
+          if (!canvas) {
+            return null;
+          }
+          const fixedHeight = 220;
+          canvas.style.height = `${fixedHeight}px`;
+          canvas.height = fixedHeight;
+          canvas.style.maxHeight = `${fixedHeight}px`;
+          return canvas;
+        };
+
         const createPieChart = (ctx, data) => {
           if (!ctx) {
             return;
@@ -543,10 +558,11 @@
         ];
 
         pieCharts.forEach(([canvasId, datasetId]) => {
-          createPieChart(
-            document.getElementById(canvasId),
-            parseDataset(datasetId)
-          );
+          const canvas = prepareCanvas(document.getElementById(canvasId));
+          if (!canvas) {
+            return;
+          }
+          createPieChart(canvas, parseDataset(datasetId));
         });
       }
     </script>
