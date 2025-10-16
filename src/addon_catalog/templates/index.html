@@ -199,7 +199,7 @@
       .charts-grid {
         display: grid;
         gap: 20px;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .chart-card {
@@ -334,6 +334,12 @@
         border-radius: 16px;
         margin-bottom: 20px;
         font-weight: 500;
+      }
+
+      @media (max-width: 840px) {
+        .charts-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
       }
 
       @media (max-width: 640px) {
@@ -496,56 +502,14 @@
           "#22c55e",
         ];
 
-        const createBarChart = (ctx, data, horizontal = false) => {
+        const createPieChart = (ctx, data) => {
           if (!ctx) {
             return;
           }
           const labels = data.labels || [];
           const values = data.values || [];
           new Chart(ctx, {
-            type: "bar",
-            data: {
-              labels,
-              datasets: [
-                {
-                  label: "数量",
-                  data: values,
-                  backgroundColor: labels.map(
-                    (_, index) => palette[index % palette.length]
-                  ),
-                  borderRadius: 10,
-                },
-              ],
-            },
-            options: {
-              indexAxis: horizontal ? "y" : "x",
-              scales: {
-                x: {
-                  ticks: { color: "#475569" },
-                  grid: { color: "rgba(148, 163, 184, 0.2)" },
-                },
-                y: {
-                  ticks: { color: "#475569" },
-                  grid: { color: "rgba(148, 163, 184, 0.2)" },
-                },
-              },
-              plugins: {
-                legend: { display: false },
-              },
-              responsive: true,
-              maintainAspectRatio: false,
-            },
-          });
-        };
-
-        const createDoughnutChart = (ctx, data) => {
-          if (!ctx) {
-            return;
-          }
-          const labels = data.labels || [];
-          const values = data.values || [];
-          new Chart(ctx, {
-            type: "doughnut",
+            type: "pie",
             data: {
               labels,
               datasets: [
@@ -571,64 +535,19 @@
           });
         };
 
-        const createLineChart = (ctx, data) => {
-          if (!ctx) {
-            return;
-          }
-          const labels = data.labels || [];
-          const values = data.values || [];
-          new Chart(ctx, {
-            type: "line",
-            data: {
-              labels,
-              datasets: [
-                {
-                  label: "数量",
-                  data: values,
-                  fill: false,
-                  borderColor: "#2563eb",
-                  backgroundColor: "#2563eb",
-                  tension: 0.3,
-                },
-              ],
-            },
-            options: {
-              plugins: {
-                legend: { display: false },
-              },
-              scales: {
-                x: {
-                  ticks: { color: "#475569" },
-                  grid: { display: false },
-                },
-                y: {
-                  ticks: { color: "#475569" },
-                  grid: { color: "rgba(148, 163, 184, 0.2)" },
-                },
-              },
-              responsive: true,
-              maintainAspectRatio: false,
-            },
-          });
-        };
+        const pieCharts = [
+          ["platformChart", "platform-chart-data"],
+          ["osChart", "os-chart-data"],
+          ["archChart", "arch-chart-data"],
+          ["releaseChart", "release-chart-data"],
+        ];
 
-        createBarChart(
-          document.getElementById("platformChart"),
-          parseDataset("platform-chart-data"),
-          true
-        );
-        createBarChart(
-          document.getElementById("osChart"),
-          parseDataset("os-chart-data")
-        );
-        createDoughnutChart(
-          document.getElementById("archChart"),
-          parseDataset("arch-chart-data")
-        );
-        createLineChart(
-          document.getElementById("releaseChart"),
-          parseDataset("release-chart-data")
-        );
+        pieCharts.forEach(([canvasId, datasetId]) => {
+          createPieChart(
+            document.getElementById(canvasId),
+            parseDataset(datasetId)
+          );
+        });
       }
     </script>
   </body>
