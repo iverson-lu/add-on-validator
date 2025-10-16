@@ -119,6 +119,112 @@
         box-shadow: 0 20px 32px rgba(59, 130, 246, 0.45);
       }
 
+      .filter-form {
+        margin-top: 0;
+        padding: 16px;
+        background: rgba(37, 99, 235, 0.08);
+        border-radius: 18px;
+        border: 1px solid rgba(37, 99, 235, 0.15);
+      }
+
+      .select-group {
+        flex: 1 1 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .select-group label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: rgba(15, 23, 42, 0.65);
+      }
+
+      .select-group select {
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        background: rgba(255, 255, 255, 0.85);
+        color: #0f172a;
+      }
+
+      .filter-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .secondary-button {
+        border: none;
+        background: rgba(37, 99, 235, 0.16);
+        color: #1d4ed8;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 12px 20px;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+
+      .secondary-button:hover {
+        background: rgba(37, 99, 235, 0.26);
+      }
+
+      .reset-link {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #1d4ed8;
+        text-decoration: none;
+      }
+
+      .panel-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .panel-header h3 {
+        margin: 0;
+      }
+
+      .result-count {
+        font-size: 0.9rem;
+        color: rgba(15, 23, 42, 0.65);
+        font-weight: 600;
+      }
+
+      .charts-grid {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+
+      .chart-card {
+        background: rgba(255, 255, 255, 0.86);
+        border-radius: 18px;
+        padding: 20px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .chart-card h4 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: rgba(15, 23, 42, 0.75);
+      }
+
+      .chart-card canvas {
+        width: 100%;
+        height: 220px;
+      }
+
       .metrics-grid {
         display: grid;
         gap: 20px;
@@ -285,12 +391,245 @@
             {{OS_CHIPS}}
           </div>
         </article>
+        <article class="metric-card">
+          <h2>系统架构类型</h2>
+          <p>{{ARCH_COUNT}}</p>
+          <div class="chip-row">
+            {{ARCH_CHIPS}}
+          </div>
+        </article>
       </section>
 
       <section class="panel">
-        <h3>最新版本列表</h3>
+        <h3>统计概览</h3>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <h4>平台分布</h4>
+            <canvas id="platformChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h4>操作系统类型</h4>
+            <canvas id="osChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h4>架构占比</h4>
+            <canvas id="archChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h4>年度发布趋势</h4>
+            <canvas id="releaseChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>最新版本列表</h3>
+          <span class="result-count">共 {{FILTERED_COUNT}} 个结果</span>
+        </div>
+        <form method="get" action="/" class="filter-form">
+          <input type="hidden" name="url" value="{{CURRENT_URL}}" />
+          <div class="select-group">
+            <label for="platform">按平台筛选</label>
+            <select id="platform" name="platform">
+              {{PLATFORM_OPTIONS}}
+            </select>
+          </div>
+          <div class="select-group">
+            <label for="os">按操作系统筛选</label>
+            <select id="os" name="os">
+              {{OS_OPTIONS}}
+            </select>
+          </div>
+          <div class="select-group">
+            <label for="arch">按架构筛选</label>
+            <select id="arch" name="arch">
+              {{ARCH_OPTIONS}}
+            </select>
+          </div>
+          <div class="filter-actions">
+            <button type="submit" class="secondary-button">应用筛选</button>
+            <a class="reset-link" href="{{CLEAR_FILTER_URL}}">清除筛选</a>
+          </div>
+        </form>
         {{VERSION_TABLE}}
       </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script type="application/json" id="platform-chart-data">
+      {{PLATFORM_CHART_DATA}}
+    </script>
+    <script type="application/json" id="os-chart-data">
+      {{OS_CHART_DATA}}
+    </script>
+    <script type="application/json" id="arch-chart-data">
+      {{ARCH_CHART_DATA}}
+    </script>
+    <script type="application/json" id="release-chart-data">
+      {{RELEASE_CHART_DATA}}
+    </script>
+    <script>
+      const parseDataset = (id) => {
+        const element = document.getElementById(id);
+        if (!element) {
+          return { labels: [], values: [] };
+        }
+        try {
+          return JSON.parse(element.textContent || "{}");
+        } catch (error) {
+          console.warn("无法解析图表数据", error);
+          return { labels: [], values: [] };
+        }
+      };
+
+      if (typeof Chart === "undefined") {
+        console.warn("Chart.js 未加载，无法渲染图表");
+      } else {
+        const palette = [
+          "#2563eb",
+          "#7c3aed",
+          "#0ea5e9",
+          "#f97316",
+          "#14b8a6",
+          "#f43f5e",
+          "#8b5cf6",
+          "#22c55e",
+        ];
+
+        const createBarChart = (ctx, data, horizontal = false) => {
+          if (!ctx) {
+            return;
+          }
+          const labels = data.labels || [];
+          const values = data.values || [];
+          new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "数量",
+                  data: values,
+                  backgroundColor: labels.map(
+                    (_, index) => palette[index % palette.length]
+                  ),
+                  borderRadius: 10,
+                },
+              ],
+            },
+            options: {
+              indexAxis: horizontal ? "y" : "x",
+              scales: {
+                x: {
+                  ticks: { color: "#475569" },
+                  grid: { color: "rgba(148, 163, 184, 0.2)" },
+                },
+                y: {
+                  ticks: { color: "#475569" },
+                  grid: { color: "rgba(148, 163, 184, 0.2)" },
+                },
+              },
+              plugins: {
+                legend: { display: false },
+              },
+              responsive: true,
+              maintainAspectRatio: false,
+            },
+          });
+        };
+
+        const createDoughnutChart = (ctx, data) => {
+          if (!ctx) {
+            return;
+          }
+          const labels = data.labels || [];
+          const values = data.values || [];
+          new Chart(ctx, {
+            type: "doughnut",
+            data: {
+              labels,
+              datasets: [
+                {
+                  data: values,
+                  backgroundColor: labels.map(
+                    (_, index) => palette[index % palette.length]
+                  ),
+                  borderWidth: 0,
+                },
+              ],
+            },
+            options: {
+              plugins: {
+                legend: {
+                  position: "bottom",
+                  labels: { color: "#475569" },
+                },
+              },
+              responsive: true,
+              maintainAspectRatio: false,
+            },
+          });
+        };
+
+        const createLineChart = (ctx, data) => {
+          if (!ctx) {
+            return;
+          }
+          const labels = data.labels || [];
+          const values = data.values || [];
+          new Chart(ctx, {
+            type: "line",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "数量",
+                  data: values,
+                  fill: false,
+                  borderColor: "#2563eb",
+                  backgroundColor: "#2563eb",
+                  tension: 0.3,
+                },
+              ],
+            },
+            options: {
+              plugins: {
+                legend: { display: false },
+              },
+              scales: {
+                x: {
+                  ticks: { color: "#475569" },
+                  grid: { display: false },
+                },
+                y: {
+                  ticks: { color: "#475569" },
+                  grid: { color: "rgba(148, 163, 184, 0.2)" },
+                },
+              },
+              responsive: true,
+              maintainAspectRatio: false,
+            },
+          });
+        };
+
+        createBarChart(
+          document.getElementById("platformChart"),
+          parseDataset("platform-chart-data"),
+          true
+        );
+        createBarChart(
+          document.getElementById("osChart"),
+          parseDataset("os-chart-data")
+        );
+        createDoughnutChart(
+          document.getElementById("archChart"),
+          parseDataset("arch-chart-data")
+        );
+        createLineChart(
+          document.getElementById("releaseChart"),
+          parseDataset("release-chart-data")
+        );
+      }
+    </script>
   </body>
 </html>
