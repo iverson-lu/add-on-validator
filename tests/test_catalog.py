@@ -97,18 +97,14 @@ def test_summarize_addons_identifies_latest_versions() -> None:
     summary = summarize_addons(addons)
     assert summary.total_addons == 2
     assert summary.unique_platforms == ["mt440", "t655"]
-    assert summary.latest_versions == {"Example": "1.1.0"}
     assert summary.unique_architectures == ["x64"]
+    assert summary.latest_versions == {"Example": "1.1.0"}
     assert summary.platform_counts == {"mt440": 1, "t655": 1}
     assert summary.os_type_counts == {"Windows": 2}
     assert summary.architecture_counts == {"x64": 2}
-    assert summary.release_year_counts == {"2025": 2}
-    assert len(summary.latest_addons) == 1
-    latest_entry = summary.latest_addons[0]
-    assert latest_entry.version == "1.1.0"
-    assert latest_entry.platforms == ["t655"]
-    assert latest_entry.os_types == ["Windows"]
-    assert latest_entry.architecture == "x64"
+    assert summary.monthly_release_counts == {"2025-01": 1, "2025-02": 1}
+    assert len(summary.latest_version_details) == 1
+    assert summary.latest_version_details[0].version == "1.1.0"
 
 
 def test_fetch_catalog_writes_response(tmp_path: Path) -> None:
