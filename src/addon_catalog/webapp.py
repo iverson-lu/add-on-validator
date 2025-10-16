@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
-from .analysis import CatalogSummary, summarize_addons
+from .analysis import CatalogSummary, LatestAddonEntry, summarize_addons
 from .fetch import fetch_catalog
 from .models import Addon
 from .parser import parse_catalog
@@ -118,6 +118,47 @@ def _render_error(error: Optional[str]) -> str:
     if not error:
         return ""
     return f'<div class="error-banner">{html.escape(error)}</div>'
+
+
+def _render_select_options(
+    values: list[str], selected: str, placeholder: str
+) -> str:
+    options = []
+    selected_attr = " selected" if not selected else ""
+    options.append(
+        f'<option value=""{selected_attr}>{html.escape(placeholder)}</option>'
+    )
+    for value in values:
+        attr = " selected" if value == selected else ""
+        options.append(
+            f'<option value="{html.escape(value)}"{attr}>{html.escape(value)}</option>'
+        )
+    return "".join(options)
+
+
+def _filter_addons(
+    entries: list[LatestAddonEntry],
+    platform: str,
+    os_type: str,
+    architecture: str,
+) -> list[LatestAddonEntry]:
+    def matches(entry: LatestAddonEntry) -> bool:
+        if platform and platform not in entry.platforms:
+            return False
+        if os_type and os_type not in entry.os_types:
+            return False
+        if architecture and architecture != (entry.architecture or ""):
+            return False
+        return True
+
+    return [entry for entry in entries if matches(entry)]
+
+
+def _build_chart_payload(counts: Mapping[str, int]) -> str:
+    labels = list(counts.keys())
+    values = list(counts.values())
+    payload = {"labels": labels, "values": values}
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def render_page(model: PageModel) -> str:

@@ -1,10 +1,11 @@
 """Analytics for add-on catalog entries."""
 
 from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import date
 from typing import Dict, Iterable, List, Mapping, Optional
+
+from collections import Counter
 
 from .models import Addon
 
@@ -101,9 +102,26 @@ def summarize_addons(addons: Iterable[Addon]) -> CatalogSummary:
         key = addon.description or addon.id
         candidate = (addon.available_date, addon.version, addon)
         if key in latest_by_description:
-            latest_by_description[key] = _select_latest(latest_by_description[key], candidate)
+            latest_by_description[key] = _select_latest(latest_by_description[key], addon)
         else:
-            latest_by_description[key] = candidate
+            latest_by_description[key] = addon
+
+        if addon.platforms:
+            platform_counter.update(addon.platforms)
+        else:
+            platform_counter.update(["未指定"])
+
+        if addon.os_types:
+            os_counter.update(addon.os_types)
+        else:
+            os_counter.update(["未指定"])
+
+        architecture_counter.update([architecture_value])
+
+        if addon.available_date:
+            release_counter.update([str(addon.available_date.year)])
+        else:
+            release_counter.update(["未知"])
 
     latest_details_sorted = [
         (desc, available_date, version, addon)
@@ -113,6 +131,25 @@ def summarize_addons(addons: Iterable[Addon]) -> CatalogSummary:
     ]
     latest_versions = {desc: version for desc, _, version, _ in latest_details_sorted}
     latest_version_details = [addon for _, _, _, addon in latest_details_sorted]
+
+    latest_addons = [
+        LatestAddonEntry(
+            description=key,
+            version=addon.version,
+            available_date=addon.available_date,
+            platforms=sorted(addon.platforms) if addon.platforms else ["未指定"],
+            os_types=sorted(addon.os_types) if addon.os_types else ["未指定"],
+            architecture=addon.architecture or "未指定",
+        )
+        for key, addon in sorted(latest_by_description.items(), key=lambda item: item[0])
+    ]
+
+    sorted_platform_counts = dict(sorted(platform_counter.items(), key=lambda item: (-item[1], item[0])))
+    sorted_os_counts = dict(sorted(os_counter.items(), key=lambda item: (-item[1], item[0])))
+    sorted_architecture_counts = dict(
+        sorted(architecture_counter.items(), key=lambda item: (-item[1], item[0]))
+    )
+    sorted_release_counts = dict(sorted(release_counter.items(), key=lambda item: item[0]))
 
     return CatalogSummary(
         total_addons=len(addon_list),
@@ -130,4 +167,4 @@ def summarize_addons(addons: Iterable[Addon]) -> CatalogSummary:
     )
 
 
-__all__ = ["CatalogSummary", "summarize_addons"]
+__all__ = ["CatalogSummary", "LatestAddonEntry", "summarize_addons"]
