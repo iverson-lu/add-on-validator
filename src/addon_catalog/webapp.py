@@ -37,12 +37,6 @@ def _load_summary(url: str) -> CatalogSummary:
     return summarize_addons(addons)
 
 
-def _render_chips(items: list[str]) -> str:
-    if not items:
-        return "<span class=\"chip\">暂无数据</span>"
-    return "".join(f"<span class=\"chip\">{html.escape(item)}</span>" for item in items)
-
-
 def _render_versions(latest_addons: list[LatestAddonEntry]) -> str:
     if not latest_addons:
         return '<div class="empty-state">当前数据源未提供任何版本信息。</div>'
@@ -138,11 +132,8 @@ def render_page(model: PageModel) -> str:
         "{{ERROR_SECTION}}": _render_error(model.error),
         "{{TOTAL_ADDONS}}": str(summary.total_addons),
         "{{PLATFORM_COUNT}}": str(len(summary.unique_platforms)),
-        "{{PLATFORM_CHIPS}}": _render_chips(summary.unique_platforms),
         "{{OS_COUNT}}": str(len(summary.unique_os_types)),
-        "{{OS_CHIPS}}": _render_chips(summary.unique_os_types),
         "{{ARCH_COUNT}}": str(len(summary.unique_architectures)),
-        "{{ARCH_CHIPS}}": _render_chips(summary.unique_architectures),
         "{{PLATFORM_OPTIONS}}": _render_select_options(
             list(summary.platform_counts.keys()),
             model.selected_platform,

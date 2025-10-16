@@ -247,34 +247,11 @@
         gap: 6px;
       }
 
-      .metric-card h2 {
-        margin: 0;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: rgba(15, 23, 42, 0.6);
-      }
-
       .metric-card p {
         margin: 0;
         font-size: clamp(1.6rem, 1.2rem + 1vw, 2.2rem);
         font-weight: 700;
         color: #0f172a;
-      }
-
-      .chip-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 10px;
-      }
-
-      .chip {
-        padding: 6px 12px;
-        border-radius: 999px;
-        background: rgba(37, 99, 235, 0.12);
-        color: #1e3a8a;
-        font-weight: 500;
-        font-size: 0.85rem;
       }
 
       .panel {
@@ -384,29 +361,16 @@
 
       <section class="metrics-grid">
         <article class="metric-card">
-          <h2>总计 Add-on 数量</h2>
           <p>{{TOTAL_ADDONS}}</p>
         </article>
         <article class="metric-card">
-          <h2>支持平台</h2>
           <p>{{PLATFORM_COUNT}}</p>
-          <div class="chip-row">
-            {{PLATFORM_CHIPS}}
-          </div>
         </article>
         <article class="metric-card">
-          <h2>操作系统类型</h2>
           <p>{{OS_COUNT}}</p>
-          <div class="chip-row">
-            {{OS_CHIPS}}
-          </div>
         </article>
         <article class="metric-card">
-          <h2>系统架构类型</h2>
           <p>{{ARCH_COUNT}}</p>
-          <div class="chip-row">
-            {{ARCH_CHIPS}}
-          </div>
         </article>
       </section>
 
