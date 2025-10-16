@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import html
+import json
 import urllib.parse
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional, Sequence
 
 from .analysis import CatalogSummary, summarize_addons
 from .fetch import fetch_catalog
+from .models import Addon
 from .parser import parse_catalog
 
 DEFAULT_URL = "https://ftp.hp.com/pub/tcimages/EasyUpdate/Images/addoncatalog.xml"
@@ -23,6 +25,9 @@ TEMPLATE_PATH = Path(__file__).with_name("templates").joinpath("index.html")
 class PageModel:
     summary: CatalogSummary
     current_url: str
+    selected_platforms: Sequence[str] = ()
+    selected_os_types: Sequence[str] = ()
+    selected_architectures: Sequence[str] = ()
     error: Optional[str] = None
 
 
@@ -39,22 +44,74 @@ def _render_chips(items: list[str]) -> str:
     return "".join(f"<span class=\"chip\">{html.escape(item)}</span>" for item in items)
 
 
-def _render_versions(latest_versions: dict[str, str]) -> str:
-    if not latest_versions:
+def _render_versions(latest_details: Sequence[Addon]) -> str:
+    if not latest_details:
         return '<div class="empty-state">当前数据源未提供任何版本信息。</div>'
 
     rows = []
-    for desc, version in latest_versions.items():
+    for addon in latest_details:
+        description = addon.description or addon.id
+        platforms = ", ".join(addon.platforms) or "—"
+        os_types = ", ".join(addon.os_types) or "—"
+        os_versions = ", ".join(addon.os_versions) or "—"
+        architecture = addon.architecture or "—"
+        available = addon.available_date.isoformat() if addon.available_date else "—"
         rows.append(
-            "<tr><td>{}</td><td>{}</td></tr>".format(
-                html.escape(desc), html.escape(version)
+            (
+                "<tr>"
+                f"<td>{html.escape(description)}</td>"
+                f"<td>{html.escape(addon.version)}</td>"
+                f"<td>{html.escape(platforms)}</td>"
+                f"<td>{html.escape(os_types)}</td>"
+                f"<td>{html.escape(os_versions)}</td>"
+                f"<td>{html.escape(architecture)}</td>"
+                f"<td>{html.escape(available)}</td>"
+                "</tr>"
             )
         )
     table = "".join(rows)
     return (
-        "<table><thead><tr><th scope=\"col\">描述</th><th scope=\"col\">最新版本</th>"
+        "<table><thead><tr>"
+        "<th scope=\"col\">描述</th>"
+        "<th scope=\"col\">最新版本</th>"
+        "<th scope=\"col\">平台</th>"
+        "<th scope=\"col\">操作系统类型</th>"
+        "<th scope=\"col\">操作系统版本</th>"
+        "<th scope=\"col\">架构</th>"
+        "<th scope=\"col\">发布日期</th>"
         "</tr></thead><tbody>{}</tbody></table>".format(table)
     )
+
+
+def _render_filter_options(items: Iterable[str], selected: Sequence[str]) -> str:
+    options: list[str] = []
+    selected_set = set(selected)
+    for item in items:
+        is_selected = " selected" if item in selected_set else ""
+        options.append(
+            f'<option value="{html.escape(item)}"{is_selected}>{html.escape(item)}</option>'
+        )
+    if not options:
+        return '<option value="" disabled>暂无可选项</option>'
+    return "".join(options)
+
+
+def _matches_filters(addon: Addon, model: PageModel) -> bool:
+    if model.selected_platforms:
+        if not set(addon.platforms).intersection(model.selected_platforms):
+            return False
+    if model.selected_os_types:
+        if not set(addon.os_types).intersection(model.selected_os_types):
+            return False
+    if model.selected_architectures:
+        architecture = addon.architecture or ""
+        if architecture not in model.selected_architectures:
+            return False
+    return True
+
+
+def _build_chart_payload(labels: Sequence[str], values: Sequence[int]) -> str:
+    return json.dumps({"labels": list(labels), "values": list(values)}, ensure_ascii=False)
 
 
 def _render_error(error: Optional[str]) -> str:
@@ -66,6 +123,10 @@ def _render_error(error: Optional[str]) -> str:
 def render_page(model: PageModel) -> str:
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     summary = model.summary
+    filtered_details = [
+        addon for addon in summary.latest_version_details if _matches_filters(addon, model)
+    ]
+
     replacements = {
         "{{CURRENT_URL}}": html.escape(model.current_url),
         "{{ERROR_SECTION}}": _render_error(model.error),
@@ -74,7 +135,29 @@ def render_page(model: PageModel) -> str:
         "{{PLATFORM_CHIPS}}": _render_chips(summary.unique_platforms),
         "{{OS_COUNT}}": str(len(summary.unique_os_types)),
         "{{OS_CHIPS}}": _render_chips(summary.unique_os_types),
-        "{{VERSION_TABLE}}": _render_versions(dict(summary.latest_versions)),
+        "{{PLATFORM_FILTER_OPTIONS}}": _render_filter_options(
+            summary.unique_platforms, model.selected_platforms
+        ),
+        "{{OS_FILTER_OPTIONS}}": _render_filter_options(
+            summary.unique_os_types, model.selected_os_types
+        ),
+        "{{ARCH_FILTER_OPTIONS}}": _render_filter_options(
+            summary.unique_architectures, model.selected_architectures
+        ),
+        "{{VERSION_TABLE}}": _render_versions(filtered_details),
+        "{{FILTERED_COUNT}}": str(len(filtered_details)),
+        "{{PLATFORM_CHART_JSON}}": _build_chart_payload(
+            summary.platform_counts.keys(), summary.platform_counts.values()
+        ),
+        "{{OS_CHART_JSON}}": _build_chart_payload(
+            summary.os_type_counts.keys(), summary.os_type_counts.values()
+        ),
+        "{{ARCH_CHART_JSON}}": _build_chart_payload(
+            summary.architecture_counts.keys(), summary.architecture_counts.values()
+        ),
+        "{{MONTHLY_CHART_JSON}}": _build_chart_payload(
+            summary.monthly_release_counts.keys(), summary.monthly_release_counts.values()
+        ),
     }
     for placeholder, value in replacements.items():
         template = template.replace(placeholder, value)
@@ -89,6 +172,9 @@ class CatalogRequestHandler(BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(parsed.query)
         raw_url = params.get("url", [DEFAULT_URL])[0]
         current_url = raw_url.strip() or DEFAULT_URL
+        selected_platforms = tuple(filter(None, params.get("platform", [])))
+        selected_os_types = tuple(filter(None, params.get("os_type", [])))
+        selected_architectures = tuple(filter(None, params.get("architecture", [])))
 
         try:
             summary = _load_summary(current_url)
@@ -97,7 +183,14 @@ class CatalogRequestHandler(BaseHTTPRequestHandler):
             summary = CatalogRequestHandler.model_cache.summary
             error = f"无法加载目录：{exc}"
 
-        model = PageModel(summary=summary, current_url=current_url, error=error)
+        model = PageModel(
+            summary=summary,
+            current_url=current_url,
+            selected_platforms=selected_platforms,
+            selected_os_types=selected_os_types,
+            selected_architectures=selected_architectures,
+            error=error,
+        )
         CatalogRequestHandler.model_cache = model
 
         body = render_page(model).encode("utf-8")
