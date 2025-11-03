@@ -44,14 +44,13 @@ def _render_versions(latest_addons: list[LatestAddonEntry]) -> str:
     rows = []
     for entry in latest_addons:
         os_types = "<br />".join(html.escape(os_type) for os_type in entry.os_types)
-        architecture = html.escape(entry.architecture or "未指定")
+        # Bug: Remove architecture column from table data
         available = entry.available_date.isoformat() if entry.available_date else "未知"
         rows.append(
             "<tr>"
             f"<td>{html.escape(entry.description)}</td>"
             f"<td>{html.escape(entry.version)}</td>"
             f"<td>{os_types}</td>"
-            f"<td>{architecture}</td>"
             f"<td>{available}</td>"
             "</tr>"
         )
@@ -110,8 +109,9 @@ def _filter_addons(
 def _build_chart_payload(counts: Mapping[str, int]) -> str:
     labels = list(counts.keys())
     values = list(counts.values())
+    # Bug: Intentionally return malformed JSON to break chart rendering
     payload = {"labels": labels, "values": values}
-    return json.dumps(payload, ensure_ascii=False)
+    return "{invalid_json:" + json.dumps(payload, ensure_ascii=False)
 
 
 def render_page(model: PageModel) -> str:
