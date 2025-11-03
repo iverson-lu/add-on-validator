@@ -43,7 +43,6 @@ def _render_versions(latest_addons: list[LatestAddonEntry]) -> str:
 
     rows = []
     for entry in latest_addons:
-        platforms = "<br />".join(html.escape(platform) for platform in entry.platforms)
         os_types = "<br />".join(html.escape(os_type) for os_type in entry.os_types)
         architecture = html.escape(entry.architecture or "未指定")
         available = entry.available_date.isoformat() if entry.available_date else "未知"
@@ -51,7 +50,6 @@ def _render_versions(latest_addons: list[LatestAddonEntry]) -> str:
             "<tr>"
             f"<td>{html.escape(entry.description)}</td>"
             f"<td>{html.escape(entry.version)}</td>"
-            f"<td>{platforms}</td>"
             f"<td>{os_types}</td>"
             f"<td>{architecture}</td>"
             f"<td>{available}</td>"
@@ -62,7 +60,6 @@ def _render_versions(latest_addons: list[LatestAddonEntry]) -> str:
         "<table><thead><tr>"
         "<th scope=\"col\">描述</th>"
         "<th scope=\"col\">最新版本</th>"
-        "<th scope=\"col\">平台</th>"
         "<th scope=\"col\">操作系统</th>"
         "<th scope=\"col\">架构</th>"
         "<th scope=\"col\">发布日期</th>"
@@ -111,10 +108,17 @@ def _filter_addons(
 
 
 def _build_chart_payload(counts: Mapping[str, int]) -> str:
-    labels = list(counts.keys())
-    values = list(counts.values())
+    labels: list[str] = []
+    values: list[int] = []
+    for label, raw_value in counts.items():
+        try:
+            value = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        labels.append(str(label))
+        values.append(value)
     payload = {"labels": labels, "values": values}
-    return json.dumps(payload, ensure_ascii=False)
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
 def render_page(model: PageModel) -> str:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -11,6 +12,7 @@ from addon_catalog.analysis import summarize_addons
 from addon_catalog.fetch import fetch_catalog
 from addon_catalog.models import Addon, FileEntry
 from addon_catalog.parser import parse_catalog
+from addon_catalog.webapp import PageModel, _build_chart_payload, _render_versions, render_page
 
 
 @pytest.fixture()
@@ -119,3 +121,40 @@ def test_fetch_catalog_writes_response(tmp_path: Path) -> None:
         fetch_catalog("http://example.com/catalog.xml", destination)
 
     assert destination.read_text() == "<AddOns></AddOns>"
+
+
+def test_build_chart_payload_produces_valid_json() -> None:
+    payload = _build_chart_payload({"x64": 2, "x86": "3", "invalid": "skip"})
+    parsed = json.loads(payload)
+    assert parsed == {"labels": ["x64", "x86"], "values": [2, 3]}
+
+
+def test_render_versions_matches_column_expectations(sample_xml: str) -> None:
+    addons = parse_catalog(sample_xml)
+    summary = summarize_addons(addons)
+    table_html = _render_versions(summary.latest_addons)
+
+    assert "<th scope=\"col\">平台</th>" not in table_html
+    # Header should expose exactly five columns.
+    assert table_html.count("<th scope=\"col\">") == 5
+    # Architecture data should render alongside release dates per row.
+    assert "<td>x64</td>" in table_html
+
+
+def test_render_page_embeds_valid_chart_json(sample_xml: str) -> None:
+    addons = parse_catalog(sample_xml)
+    summary = summarize_addons(addons)
+    page = render_page(PageModel(summary, "http://example.com"))
+
+    def extract(identifier: str) -> dict[str, object]:
+        marker = f'<script type="application/json" id="{identifier}">'  # nosec: B608
+        start = page.index(marker) + len(marker)
+        end = page.index("</script>", start)
+        raw = page[start:end].strip()
+        return json.loads(raw)
+
+    ordered_labels = list(summary.platform_counts.keys())
+    assert extract("platform-chart-data") == {
+        "labels": ordered_labels,
+        "values": [summary.platform_counts[key] for key in ordered_labels],
+    }
